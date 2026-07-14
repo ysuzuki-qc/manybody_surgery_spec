@@ -2,13 +2,13 @@
 
 ## Background
 
-In the most standard fault-tolerant quantum-computing architecture, qubits are encoded with surface codes, which constitute a square block of two-dimensional array of qubits. The operations on multiple surface-code qubits are implemented using lattice surgery, which routes the relevant logical qubits through two-dimensional space using un-used surface-code blocks. To accelerate the operations, optimizing the routing sequence can therefore increase instruction-level parallelism and minimize algorithm execution time, which can be rephrased as a kind of 3D-variant Tetris. The aim of this document is to describe the rule of basic lattice surgery routing.
+In the most common fault-tolerant quantum-computing architecture, qubits are encoded using surface codes, each of which occupies a square block in a two-dimensional array of physical qubits. Operations involving multiple surface-code qubits are implemented using lattice surgery, which connects the relevant logical qubits through two-dimensional space using unused surface-code blocks. Optimizing these routes can increase instruction-level parallelism and reduce the overall execution time of an algorithm. The resulting optimization problem can be viewed as a three-dimensional variant of Tetris. This document describes the basic rules of lattice-surgery routing.
 
-## Lattice-surgery
+## Lattice Surgery
 
-Consider a subset of two-dimensional grid of node `(x_1, y_1), (x_2, y_2), ... (x_v, y_v)`. Some pairs of neiboging nodes (i.e., `(x_i, y_i), (x_j, y_j)` such that `|x_i-x_j| + |y_i-y_j| = 1`) are connected by edges `(i,j) \in E`. We choose `n` nodes among `v` nodes and encode `n` qubit data into them. We say nodes with data are data nodes, and those without data are empty nodes. A lattice surgery instruction can be executed by choosing a tree graph that connects target target data nodes using empty nodes, i.e., Steiner tree.
+Consider a subset of a two-dimensional grid consisting of nodes `(x_1, y_1), (x_2, y_2), ... (x_v, y_v)`. Some pairs of neighboring nodes—namely, `(x_i, y_i)` and `(x_j, y_j)` such that `|x_i-x_j| + |y_i-y_j| = 1`—are connected by edges `(i,j) \in E`. We choose `n` of the `v` nodes to hold `n` data qubits. Nodes that hold data qubits are called data nodes, and the remaining nodes are called empty nodes. A lattice-surgery instruction can be executed by selecting a tree that has all the operand data nodes as leaves (node with one edge) and empty nodes as branches (node with more than one edges); that is, by selecting a Steiner tree.
  
-Suppose there are two-dimensional grids with 24 nodes `1 <= x_i <= 8' and '1 <= y_i <= 3` and `n=4` data nodes are located at `(1,1), (2,1), (5,3), (7,2)`. This situation can be visualized with the following schematic, where an integer indicates the data node with the corresponding index, and `.` indicates empty node.
+Suppose a two-dimensional grid has 24 nodes satisfying `1 <= x_i <= 8` and `1 <= y_i <= 3`, and `n=4` data nodes are located at `(2,2)`, `(3,2)`, `(5,3)`, and `(7,2)`. The following schematic illustrates this arrangement. Each integer denotes the data node with that index, and `.` denotes an empty node.
 ```
 . . . . . . . .
 
@@ -17,17 +17,16 @@ Suppose there are two-dimensional grids with 24 nodes `1 <= x_i <= 8' and '1 <= 
 . . . . 3 . . .
 ```
 
-Lattice surgery is an instruction that demands connecting multiple data nodes with a tree of empty nodes with specific boundaries. For example, `LATTICE_SURGERY [2 4] [V H]` requests conencting 2nd and 4th data node with vertical (up or down) and horizontal (left or right) boundaries, respectively. Since there are two vertical edges and two horizontal edges, we can choose preferrable ones from them. One possible implementation of an instruction that connects qubit 2 vertically and qubit 4 horizontally is as follows, where `*` are empty nodes temporally used for this operation, and `-` and `|` are used edges.
+A lattice-surgery instruction requires multiple data nodes to be connected by a tree of empty nodes through specified boundaries. For example, `LATTICE_SURGERY [2 4] [V H]` requests a connection to the second data node through a vertical boundary (above or below) and to the fourth data node through a horizontal boundary (left or right). Because each data node has two boundaries of each specified orientation, either suitable boundary may be selected. One possible implementation is shown below, where `*` denotes an empty node temporarily used by the operation, and `-` and `|` denote the edges used.
 ```
-. . *.*-*-*-. . .
+. . *-*-*-* . . .
     |     |
 . 1 2 . . *-4 .
 
 . . . . 3 . . .
 ```
 
-A way of implementing the lattice surgery is not unique. The same instruction can also be executed as follows.
-Note that the latency of lattice surgery is constant and independent of the size of the tree. 
+The implementation of a lattice-surgery instruction is not unique. The same instruction can also be executed as follows. Note that the latency of lattice surgery is constant and independent of the size of the tree.
 ```
 . . . . . *-*-*
           |   |
@@ -36,7 +35,7 @@ Note that the latency of lattice surgery is constant and independent of the size
 . . *-* 3 . . .
 ```
 
-Lattice sugery might act on more than two data nodes. An example is `LATTICE_SURGERY [1 3 4] [H H H]`. An example implementation of this instruction is as follows.
+Lattice surgery may act on more than two data nodes. For example, `LATTICE_SURGERY [1 3 4] [H H H]` can be implemented as follows.
 ```
 . . . . . . . .
                
@@ -46,14 +45,13 @@ Lattice sugery might act on more than two data nodes. An example is `LATTICE_SUR
 ```
 
 
-### Rules for instructions
-We show a list of rules using the example of `LATTICE_SURGERY [1 3 4] [H H H]`.
-The chosen routing graph can be represented by a set of edges contained in the graph.
-Each routing graph assigned for instructions must satisfy the following rule.
+### Rules for Instructions
 
-- **Rule 1. routing graph must be a tree**
+The following rules are illustrated using `LATTICE_SURGERY [1 3 4] [H H H]`. A selected routing graph can be represented by its set of edges. Every routing graph assigned to an instruction must satisfy the following rules.
 
-The following is invalid as it contains loop around `(4,1),(5,1),(5,2),(4,2)`
+- **Rule 1. The routing graph must be a tree.**
+
+The following graph is invalid because it contains a cycle through `(4,1)`, `(5,1)`, `(5,2)`, and `(4,2)`.
 ```
 . . . *-* . . .
       | |       
@@ -62,7 +60,7 @@ The following is invalid as it contains loop around `(4,1),(5,1),(5,2),(4,2)`
 *-*-*-*-3 . . .
 ```
 
-The following is invalid as it contains loop including data node 3.
+The following graph is invalid because it contains a cycle through data node 3.
 ```
 . . . . . . . .
                
@@ -71,7 +69,7 @@ The following is invalid as it contains loop including data node 3.
 *-*-*-*-3-* . .
 ```
 
-The following is invalid as this edgeset is disconnected.
+The following graph is invalid because its edge set is disconnected.
 ```
 . . . . . . . .
                  
@@ -80,9 +78,9 @@ The following is invalid as this edgeset is disconnected.
 *-*-*-*-3 . . .
 ```
 
-- **Rule 2. Every target node must be a leaf of a routing graph**
+- **Rule 2. Every operand node must be a leaf of the routing graph.**
 
-The following is invalid as target data node 3 is not connected.
+The following graph is invalid because operand data node 3 is not connected.
 ```
 . . . . . . . .
                
@@ -91,7 +89,7 @@ The following is invalid as target data node 3 is not connected.
 *-*-*-* 3 . . .
 ```
 
-The following is invalid as data node 3 is not a leaf of a tree.
+The following graph is invalid because data node 3 is not a leaf of the tree.
 ```
 . . . . . . . .
                
@@ -100,9 +98,9 @@ The following is invalid as data node 3 is not a leaf of a tree.
 *-*-*-*-3-* . .
 ```
 
-- **Rule 3. Each leaf of a tree must be a node**
+- **Rule 3. Every leaf of the tree must be a data node.**
 
-The following is invalid as a tree is terminated at empty node `(4,1)`
+The following graph is invalid because the tree terminates at the empty node `(4,1)`.
 ```
 . . . * . . . .
       |         
@@ -111,9 +109,9 @@ The following is invalid as a tree is terminated at empty node `(4,1)`
 *-*-*-*-3 . . .
 ```
 
-- **Rule 4. all the non-target nodes must not be connected**
+- **Rule 4. No non-operand data node may be connected.**
 
-The following is invalid as non-target data node 2 is connected
+The following graph is invalid because non-operand data node 2 is connected.
 ```
 . . . . . . . .
                
@@ -122,9 +120,9 @@ The following is invalid as non-target data node 2 is connected
 *-*-*-*-3 . . .
 ```
 
-- **Rule 5. all the data node must be touched from appropriate direction**
+- **Rule 5. Every operand data node must be approached from the specified direction.**
 
-The following is invalid as target data node 3 is connected vertically
+The following graph is invalid because operand data node 3 is connected vertically.
 ```
 . . . . . . . .
                
@@ -133,21 +131,19 @@ The following is invalid as target data node 3 is connected vertically
 *-*-*-* 3 * . .
 ```
 
-Briefly saying, the condition is that `each routing graph must be a Steiner tree that is terminated at the appopriate boundaries of data nodes and that does not contain non-target data nodes.`
+In short, `each routing graph must be a Steiner tree whose leaves terminate at the specified boundaries of the operand data nodes and that contains no non-operand data nodes.`
 
-### Parallel execution
+### Parallel Execution
 
-Executing a lattice-surgery instruction takes one unit of time, and temporally used empty nodes will be released after execution.
-Task will be provided as a sequence of lattice surgery instruction, and our mission is to minimize the execution time.
-To this end, we would like to maximumze the instruction throughput by executing them in parallel as far as possible.
+Executing a lattice-surgery instruction takes one unit of time, and the empty nodes used temporarily by the instruction are released afterward. A task is provided as a sequence of lattice-surgery instructions, and the objective is to minimize the total execution time. To this end, we maximize instruction throughput by executing as many instructions in parallel as possible.
 
-Suppose there are two instructions.
+Suppose there are three instructions.
 ```
 1: LATTICE_SURGERY [1 3] [H H]
 2: LATTICE_SURGERY [2 4] [V H]
 3: LATTICE_SURGERY [2 3] [H H]
 ```
-A possible solution for each of them as follows
+A possible route for each instruction is shown below.
 ```
 1: LATTICE_SURGERY [1 3] [H H]
 . . . . . . . .
@@ -175,7 +171,7 @@ A possible solution for each of them as follows
 . . . *-3 . . .
 ```
 
-Then, the first and last routes can be executed in parallel.
+The first and second routes can then be executed in parallel.
 ```
 T=1
 . . *-*-*-* . .
@@ -185,7 +181,7 @@ T=1
 *-*-*-*-3 . . .
 ```
 
-After finishing the first two instructions, we can perform the third instruction at T=2.
+After the first two instructions finish, the third instruction can be executed at `T=2`.
 ```
 . . . . . . . .
                 
@@ -194,14 +190,15 @@ After finishing the first two instructions, we can perform the third instruction
 . . . *-3 . . .
 ```
 
-For provided `m` instructions, we need to find a sequence of trees to minimize the time to finish all the instructions.
+For a given set of `m` instructions, we must find routing trees and a schedule that minimize the time required to complete all instructions.
 
-### Rules in parallel execution
-We show a list of rules using concrete examples.
+### Rules for Parallel Execution
 
-- **Parallel rule 1. Routing trees must not share any empty node**
+The following rules are illustrated with concrete examples.
 
-The following two cannot be executed in parallel as they share empty node at `(4,2)`
+- **Parallel Rule 1. Routing trees must not share any empty node at the same time**
+
+The following two instructions cannot be executed in parallel because their trees share the empty node at `(4,2)`.
 ```
 1: LATTICE_SURGERY [1 4] [V H]
 . *-*-*-* . . . .
@@ -218,9 +215,9 @@ The following two cannot be executed in parallel as they share empty node at `(4
 . . . . 3 . . .
 ```
 
-- **Parallel rule 2. Routing trees must not share data cell with different types of boundaries**
+- **Parallel Rule 2. Routing trees must not share a data node through boundaries of different orientations at the same time**
 
-The following two cannot be executed in parallel as they share data node with different directions.
+The following two instructions cannot be executed in parallel because they approach a shared data node from different directions.
 ```
 1: LATTICE_SURGERY [1 2] [V V]
 
@@ -238,7 +235,7 @@ The following two cannot be executed in parallel as they share data node with di
 . . . . 3 . . .
 ```
 
-Note that sharing a certain data node with the same boundary types is allowed. The following two instructions can be executed in parallel.
+Sharing a data node through boundaries of the same orientation is allowed. Therefore, the following two instructions can be executed in parallel.
 ```
 1: LATTICE_SURGERY [1 2] [V V]
 
@@ -260,7 +257,7 @@ Note that sharing a certain data node with the same boundary types is allowed. T
 ## Input and Output
 
 ### Input
-The input is written in the following form.
+The input has the following format.
 ```
 v e n m
 x_1 y_1
@@ -275,23 +272,23 @@ t_1
 q_{1,1} q_{1,2} ... q_{1,t_1}
 p_{1,1} p_{1,2} ... p_{1,t_1}
 t_2
-q_{2,1} q_{2,2} ... q_{2,t_1}
-p_{2,1} p_{2,2} ... p_{2,t_1}
+q_{2,1} q_{2,2} ... q_{2,t_2}
+p_{2,1} p_{2,2} ... p_{2,t_2}
 ...
 t_m
-q_{m,1} q_{m,2} ... q_{m,t_1}
-p_{m,1} p_{m,2} ... p_{m,t_1}
+q_{m,1} q_{m,2} ... q_{m,t_m}
+p_{m,1} p_{m,2} ... p_{m,t_m}
 ```
 
-Here, `v`, `e`, `n` and `m` are positive integers, which corresponds to the number of nodes, edges, data nodes, and instructions. `x_i` and `y_i` are a X- and Y- cordinate of the i-th node.
-`w_{i,1}` and `w_{i,2}` indicates i-th edge connects the `w_{i,1}`-th and `w_{i,2}`-th nodes and satisfy `1 <= w_{i,1}, w_{i,2} <= v`.
-`t_i` is the number of target data cells for i-th lattice surgery instructions and satisfy `2 <= t_i <= n`.
-`q_{i,j}` is the index of j-th target data cell for i-th lattice-surgery instruction and satisfy `1 <= q_{i,j} <= n`. Each data node appears at most once at the operand of each instruction, i.e., if `j \neq j'` then `q_{i,j} \neq q_{i,j'}`.
-`p_{i,j}` is the boundary of j-th target data cell for i-th lattice-surgery instruction and satisfy `p_{i,j} \in {H,V}`.
+Here, `v`, `e`, `n`, and `m` are positive integers denoting the numbers of nodes, edges, data nodes, and instructions, respectively. `x_i` and `y_i` are the x- and y-coordinates of the `i`-th node.
+`w_{i,1}` and `w_{i,2}` indicate that the `i`-th edge connects nodes `w_{i,1}` and `w_{i,2}`, where `1 <= w_{i,1}, w_{i,2} <= v`.
+`t_i` is the number of operand data nodes in the `i`-th lattice-surgery instruction and satisfies `2 <= t_i <= n`.
+`q_{i,j}` is the index of the `j`-th operand data node in the `i`-th lattice-surgery instruction and satisfies `1 <= q_{i,j} <= n`. Each data node appears at most once among the operands of an instruction; that is, if `j \neq j'`, then `q_{i,j} \neq q_{i,j'}`.
+`p_{i,j}` specifies the boundary orientation of the `j`-th operand data node in the `i`-th lattice-surgery instruction and satisfies `p_{i,j} \in {H,V}`.
 
 
 ### Output
-The output must be writte in the following form.
+The output must have the following format.
 ```
 P_1 P_2 ... P_n
 T_1 R_1 E_{1,1} E_{1,2} ... E_{1,R_1}
@@ -300,52 +297,48 @@ T_2 R_2 E_{2,1} E_{2,2} ... E_{2,R_2}
 T_m R_m E_{m,1} E_{m,2} ... E_{m,R_m}
 ```
 
-Here, `P_i` is the node of i-th qubit is located and must satisfy `1 <= P_i <= v`. As qubit are located in different place, if `i \neq i'` then `P_i \neq P_i'`.
-`T_i` is the clock time of i-th lattice-surgery instruction will be executed and must satisfy `1 <= T_i` (the first clock time is 1). If `i < j` then `T_i <= T_j`.
-`R_i` is the number of edges used for a routing tree of i-th lattice-surgery instruction and must satisfy `1 <= R_i <= e`.
-`E_{i,j}` is the j-th edge included in the routing tree for the i-th lattice surgery instruction. As each edge can appear at most one time in a tree, if `j \neq j'` then `E_{i,j} \neq E_{i,j'}`. 
+Here, `P_i` is the node at which the `i`-th qubit is located and must satisfy `1 <= P_i <= v`. Because different qubits occupy different nodes, if `i \neq i'`, then `P_i \neq P_i'`.
+`T_i` is the clock cycle in which the `i`-th lattice-surgery instruction is executed and must satisfy `1 <= T_i` (the first clock cycle is 1). If `i < j`, then `T_i <= T_j`.
+`R_i` is the number of edges in the routing tree for the `i`-th lattice-surgery instruction and must satisfy `1 <= R_i <= e`.
+`E_{i,j}` is the `j`-th edge in the routing tree for the `i`-th lattice-surgery instruction and must satisfy `1 <= E_{i,j} <= e`. Each edge may appear at most once in a tree; thus, if `j \neq j'`, then `E_{i,j} \neq E_{i,j'}`.
 
-Each tree must satisfy all the Rules and Parallel Rules described the above. Trees that are executed at the same time must satisfy the rule 9,10 described the above. Our aim is to minimize `T_m`.
+Each tree must satisfy all Rules and Parallel Rules described above. Trees executed at the same time must satisfy both Parallel Rules. The objective is to minimize `T_m`.
 
 
 ### Problem size
-`v` and `n` must be at least 50 for the advantage of quantum computing, and 10,000 would be enough for most applications.
-`m` would at least about 1,000 for the advantage of quantum computing, and at most 10^15 for meaningful applications.
+To demonstrate a quantum-computing advantage, `v` and `n` should be at least 50; values up to 10,000 should be sufficient for most applications.
+Similarly, `m` should be at least approximately 1,000 and at most `10^15` for applications of practical interest.
 
 
 ## Problem simplification
-The above definition is complicated, we can typically simplify the problem as follows. The following conditions are not necessarily assumed, but some papers employ them for simplifying the problem and focusing on the optimization.
+The definition above is complex, so the problem is often simplified using the assumptions below. These assumptions are optional, but some papers use them to isolate the optimization problem.
 
-- **Assumption 1: grid field**
+- **Assumption 1: rectangular grid**
 
-Most architecture focuses on a case where nodes are located inside a certain rectangle region, and we can typically assume all the nearest-neighboring cells are connected by edges.
-In such case, we can specify the `x_i, y_i, w_{i,j}` with two integers `w,h` instead of a list of node locations. For example `w=3, h=2` meas
+Most architectures place nodes in a rectangular region, with edges connecting all nearest-neighbor pairs. In this case, the coordinates `x_i, y_i` and edges `w_{i,j}` can be specified by two integers, `w` and `h`, rather than by explicit lists of nodes and edges. For example, `w=3, h=2` means
 ```
 6 7 n m
 1 1
 1 2
-1 3
 2 1
 2 2
-2 3
+3 1
+3 2
 1 2
-1 4
-2 3
-2 5
-3 6
-4 5
+1 3
+2 4
+3 4
+3 5
+4 6
 5 6
 ```
 
 
 - **Assumption 2: fixed layouts**
 
-We are typically requested to determine qubit placement, i.e., data node index to node index.
-However, finding the best placement and finding the best routing is correlated and is difficult to solve at the same time.
-To simplify the problem and focus on the routing problem only, we sometimes assume a fixed qubit layout.
+We are typically required to determine the qubit placement; that is, the mapping from data-qubit indices to node indices. However, placement and routing are interdependent and difficult to optimize simultaneously. To focus exclusively on routing, we sometimes assume a fixed qubit layout.
 
-While we want to compactly place data qubits, we also need to connect at least one of horizontal and vertical boundaries, 
-With this reason, the following layouts are popular choices.
+Although data qubits should be placed compactly, at least one horizontal and one vertical boundary of each data qubit must remain accessible. For this reason, the following layouts are popular choices.
 ```
 1-in-4 location (25% density)
 . . . . . . . 
@@ -361,14 +354,14 @@ With this reason, the following layouts are popular choices.
 4-in-9 location (44% density)
 . . . . . . . 
 . 1 2 . 5 6 .
-. 3 4 . 6 8 .
+. 3 4 . 7 8 .
 . . . . . . .
 . 9 a . d e .
 . b c . f g .
 . . . . . . . 
 ```
 
-While routing becomes trivial, the best known density letting each node expose one horizontal and vertical boundary as follows.
+The densest known layout in which every data node exposes both a horizontal and a vertical boundary is shown below, although routing then becomes highly constrained.
 ```
 1-in-2 location (50% density)
 . . . . . . . . .
@@ -412,32 +405,25 @@ k l m n o
 
 - **Assumption 3: two-body measurement**
 
-Several popular compliation schemes only generate lattice surgery instructions with two target qubit `t_i=2`.
-One promising way to determine each lattice sugery tree is to assign the shortest tree in a greedy manner.
-This is equal to minimum Steiner tree problem and known to be NP-hard, and we need to use approximated algorithms.
-If we can assume `t_i=2`, this problem becomes shortest path finding, which can be solved with a polynomial time.
+Several popular compilation schemes generate only lattice-surgery instructions with two operand qubits (`t_i=2`). One promising approach is to greedily assign a shortest tree to each instruction. In general, this is the minimum Steiner tree problem, which is NP-hard and therefore requires approximation algorithms. When `t_i=2`, however, it reduces to a shortest-path problem that can be solved in polynomial time.
 
 
 - **Assumption 4: same boundary**
 
-Several popular compliation schemes only generate lattice surgery instructions toucing the same types of boundaries, i.e., `p_{i,1} = p_{i,2} = ... p_{i,R_i}`
-As the direction of boundaries are not essential for solving the routing problems, this simplifies the solver and allows us to focus on the routing problem.
+Several popular compilation schemes generate only lattice-surgery instructions that touch boundaries of the same orientation; that is, `p_{i,1} = p_{i,2} = ... = p_{i,t_i}`. Because boundary orientation is not essential to the core routing problem, this assumption simplifies the solver.
 
 
 ## Problem extension
 
-The following extensions are theoretically available, while problem definitions become complicated.
+The following extensions are theoretically possible, although they make the problem definition more complex.
 
-- **Extention 1: Rotation**
+- **Extension 1: Rotation**
 
-Every data cell can perform ROTATION instruction, which rotates the orientation of qubits with 90 degrees.
-This operation consumes any empty node connected to the data node, and take two clock time.
-After the operation, all the boundary types of all the following instructions will be flipped as V<->H.
-Suppose the following instructions.
+Every data node can execute a `ROTATION` instruction, which rotates the qubit orientation by 90 degrees. This operation occupies an empty node adjacent to the data node and takes two clock cycles. Afterward, the boundary orientations in all subsequent instructions are exchanged (`V <-> H`). Consider the following instructions.
 ```
-LATTICE_SUGERY [1,2] [H H]
-LATTICE_SUGERY [1,2] [V V]
-LATTICE_SUGERY [1,2] [H H]
+LATTICE_SURGERY [1,2] [H H]
+LATTICE_SURGERY [1,2] [V V]
+LATTICE_SURGERY [1,2] [H H]
 
 T=1
 . . . . 
@@ -463,10 +449,10 @@ T=3
 ```
 We can insert ROTATION instructions at T=2.
 ```
-LATTICE_SUGERY [1,2] [H H]
-ROTATION 1 U
-LATTICE_SUGERY [1,2] [H V]
-LATTICE_SUGERY [1,2] [V H]
+LATTICE_SURGERY [1,2] [H H]
+ROTATION 1
+LATTICE_SURGERY [1,2] [H V]
+LATTICE_SURGERY [1,2] [V H]
 
 T=1
 . . . . 
@@ -508,17 +494,15 @@ T=5
 
 
 
-- **Extention 2: Moving logical qubit**
+- **Extension 2: Moving a logical qubit**
 
-We are allowed to insert MOVE instruction, which changes the position of data node from a certain node to another.
-MOVE instruction takes one clocks and consumes empty nodes on a path between original and target nodes.
-If the boundary type of connecting paths to original and target nodes are different, the boundary types of the following operations are flipped V<->H.
+We may insert a `MOVE` instruction, which moves a data qubit from one node to another. A `MOVE` instruction takes one clock cycle and occupies the empty nodes along a path between the original and destination nodes. If the path connects to the original and destination nodes through boundaries of different orientations, the boundary orientations of subsequent operations are exchanged (`V <-> H`).
 
 ```
-LATTICE_SUGERY [1,2] [H H]
+LATTICE_SURGERY [1,2] [H H]
 MOVE 1 [(2,2), (1,2)]
-LATTICE_SUGERY [1,2] [V V]
-LATTICE_SUGERY [1,2] [H H]
+LATTICE_SURGERY [1,2] [V V]
+LATTICE_SURGERY [1,2] [H H]
 
 T=1
 . . . . 
@@ -550,10 +534,10 @@ T=4
 ```
 
 ```
-LATTICE_SUGERY [1,2] [H H]
+LATTICE_SURGERY [1,2] [H H]
 MOVE 1 [(2,2), (1,1)]
-LATTICE_SUGERY [1,2] [H V]
-LATTICE_SUGERY [1,2] [V H]
+LATTICE_SURGERY [1,2] [H V]
+LATTICE_SURGERY [1,2] [V H]
 
 T=1
 . . . . 
@@ -584,42 +568,35 @@ T=4
 . . . .
 ```
 
-- **Extention 3: Reordering lattice surgery instruction**
+- **Extension 3: Reordering lattice-surgery instructions**
 
-We are allowed to reorder the sequence of quantum operations.
-This can be achieved if the following conditions are satisfied for the consecutive instructions.
+We may reorder a sequence of quantum operations when two consecutive instructions satisfy the following conditions.
 
-1. Let Q be a subset of data nodes that both two lattice surgery operations act on.
-2. Let T be the number of the data nodes in Q that are accessed through different types of faces, namely H and V.
-3. If and only if the number of T is even, their order can be swapped without changing the behavior.
+1. Let `Q` be the set of data nodes on which both lattice-surgery operations act.
+2. Let `T` be the number of data nodes in `Q` that the two operations access through different boundary orientations (`H` and `V`).
+3. The operations can be swapped without changing their behavior if and only if `T` is even.
 
-- `LATTICE_SUGERY [0 1] [H H]` and `LATTICE_SUGERY [2 3] [H H]` can be reordered as they do not have overlapping targets.
-- `LATTICE_SUGERY [0 1] [H H]` and `LATTICE_SUGERY [1 2] [H H]` can be reordered as they share data node 1 but access with the same boundary.
-- `LATTICE_SUGERY [0 1] [H H]` and `LATTICE_SUGERY [1 2] [V H]` cannot be reordered as they share data node 1 and access with the different boundary.
-- `LATTICE_SUGERY [0 1] [H H]` and `LATTICE_SUGERY [0 1] [V V]` can be reordered as they share data node 1 and access with the different boundary twice.
+- `LATTICE_SURGERY [0 1] [H H]` and `LATTICE_SURGERY [2 3] [H H]` can be reordered because they have no overlapping operand data nodes.
+- `LATTICE_SURGERY [0 1] [H H]` and `LATTICE_SURGERY [1 2] [H H]` can be reordered because they access their shared data node, node 1, through the same boundary orientation.
+- `LATTICE_SURGERY [0 1] [H H]` and `LATTICE_SURGERY [1 2] [V H]` cannot be reordered because they access their shared data node, node 1, through different boundary orientations.
+- `LATTICE_SURGERY [0 1] [H H]` and `LATTICE_SURGERY [0 1] [V V]` can be reordered because they access shared data nodes through different boundary orientations twice.
 
 When we allow reordering, we can quickly check whether a certain instruction is ready for execution by creating a dependency graph in advance.
-A denepdency graph is a directional graph where each node corresponds to an instruction, and edge connects nodes A to B if the instruction B must be executed after instruction A.
-Once we create this graph, we can judge whether we can execute the instruction A by checking all the parents of instruction A are finished.
+A dependency graph is a directed graph in which each node represents an instruction and an edge from `A` to `B` indicates that instruction `B` must be executed after instruction `A`. Once this graph has been constructed, an instruction is ready to execute if all its predecessors have finished.
 
-- **Extention 4: Magic states**
+- **Extension 4: Magic states**
 
-In practice, we sometimes needs to use magic-state to achieve a universal fault-tolerant quantum computation.
-We can anytime allocate or deallocate magic-state factory at a certain position. Once we allocate magic-state factory, we cannot use that node for lattice surgery.
-For simplicity, we assume magic-state factories consumes 2x2 connected regions of node network.
-Once allocated, that node can repeat trials to generate a resource called magic state. This trial can be executed in each clock time and succeeds with a certain probability `p`.
+In practice, magic states are needed for universal fault-tolerant quantum computation. A magic-state factory may be allocated or deallocated at a chosen location. While a factory is allocated, its nodes cannot be used for lattice surgery. For simplicity, we assume that each factory occupies a connected `2 x 2` region of the node network. Once allocated, a factory can attempt to generate a magic state during every clock cycle, with success probability `p` per attempt.
 
-Each lattice surgery instruction has additional argument `M \in [0,1]`. If `M=1`, this must be connected to magic states. The boundary to connect magic-state factory is arbitrary.
-Once we connect it to magic-state factory, we need to temporally allocate additional node neighboring to the magic-state node. This node will be removed after `R` clock time.
-The value `p` and `R` are constant and given as a problem.
+Each lattice-surgery instruction has an additional argument `M \in {0,1}`. If `M=1`, the instruction must be connected to a magic-state factory; the factory boundary used for this connection is unrestricted. Once the connection is made, an additional node adjacent to the magic-state node must be allocated temporarily. This allocation is released after `R` clock cycles. The constants `p` and `R` are given as part of the problem.
 
 ```
 R=3
 p=0.1
-LATTICE_SUGERY [0 1] [H H] 1
+LATTICE_SURGERY [0 1] [H H] 1
 
 T=1 create magic state factory at 2x2 region of (6,1),(6,2),(7,1),(7,2).
-Since this instrution consumes a magic state, we need to wait for successful generation.
+Because this instruction consumes a magic state, execution must wait until one has been generated successfully.
 . . . . . M M
 
 . 0 . 1 . M M
@@ -634,7 +611,7 @@ T=7, suppose that magic-factory succeeds magic-state generation
 
 . . . . . . .
 
-T=8, suppose that magic-factory succeeds magic-state generation
+T=8
 . . *-*-*-M M
     |
 . 0-*-1 . M M
@@ -643,18 +620,18 @@ T=8, suppose that magic-factory succeeds magic-state generation
 ```
 
 Actual magic-state generation procedure is complicated. Please see [A game of surface codes](https://arxiv.org/pdf/1808.02892) for more details.
-(Technically saying, the above definition uses Auto-corrected pi/8 rotation in Fig.17, and 2x2 block corresponds to left top 2x2 region in Fig.17(c) step 2. We assume magic-state is generated by [magic-state cultivation](https://arxiv.org/abs/2409.17595), and its distillation is included in a program.)
+(More precisely, the definition above uses the autocorrected pi/8 rotation in Fig. 17, and the `2 x 2` block corresponds to the upper-left `2 x 2` region in step 2 of Fig. 17(c). We assume that magic states are generated by [magic-state cultivation](https://arxiv.org/abs/2409.17595) and that distillation is included in the program.)
 
-- **Extention 5: Clifford gates**
+- **Extension 5: Clifford gates**
 
 We can also execute logical Hadamard and Phase gates to the data in a data node.
-We can execute logical Hadamard gates with zero time-clock, and all the boundaries of the following instructions will be fliped. If we want to let them back to the original boundary, we need to perform ROTATION, which takes two clock time. An instruction form is as follows. 
+Logical Hadamard gates take zero clock cycles, and they exchange the boundary orientations of all subsequent instructions. Restoring the original orientations requires a `ROTATION`, which takes two clock cycles. The instruction format is
 ```
 HADAMARD 3
 ```
 Essentially, we can remove all the HADAMARD instruction by flipping the boundary type for all the subsequent instructions.
 
-We can execute logical X-Phase and Z-Phase gate (corresponding to pi/4 rotation with X- and Z-axis) with a single-time clock. We assume method by [Hirai et al](https://arxiv.org/abs/2604.13632) and it takes one clock time. This instruction temporally dominates a neighboring block like ROTATION, but the additional node must be neighboring to the data node with the horizontal or vertically connected, which will be specified by the instruction. A form of instruction is 
+Logical X-phase and Z-phase gates, corresponding to pi/4 rotations about the X and Z axes, can be executed in one clock cycle. We assume the method of [Hirai et al.](https://arxiv.org/abs/2604.13632). Like `ROTATION`, this instruction temporarily occupies an adjacent block. The instruction specifies whether that block must be horizontally or vertically adjacent to the data node. Its format is
 ```
 PHASE 3 H
 ```

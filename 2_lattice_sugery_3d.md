@@ -2,11 +2,11 @@
 
 ## Background
 
-This document descibes how we can extend 2D routing problems into 3D space. This is based on [K. Hamada et al., Efficient and high-performance routing of lattice-surgery paths on three-dimensional lattice](https://arxiv.org/abs/2401.15829).
+This document describes how the 2D routing problem can be extended to three-dimensional space. It is based on [K. Hamada et al., *Efficient and High-Performance Routing of Lattice-Surgery Paths on a Three-Dimensional Lattice*](https://arxiv.org/abs/2401.15829).
 
 
 ## Extension to 3D Routing
-Suppose many-body lattice surgery instruction `LATTICE_SUGERY [2 3] [V V]` on the following placement.
+Consider the many-body lattice-surgery instruction `LATTICE_SURGERY [2 3] [V V]` on the following layout.
 ```
 . . . . . . . . .
 
@@ -20,7 +20,7 @@ A simple routing result for this situation is as follows.
 1 . 2 . 3 . 4 . 5
 ```
 
-Instead, we can execute this instruction using two time clocks as follows.
+Alternatively, we can execute this instruction over two clock cycles as follows.
 ```
 T=1
 . . . ^-* . . . .
@@ -31,19 +31,17 @@ T=2
     |    
 1 . 2 . 3 . 4 . 5
 ```
-Here, a symbol `^` represents a graph is connected to the graph at the next time, and the top of Z-axis movement, we put Z-movement terminator `v`. 
-If we represent a coordinate `(x,y)` with a time clock `T` as `(x,y,T)`, this routing tree is `(5,2,1),(5,1,1),(4,1,1),(4,1,2),(3,1,2),(3,2,2)`. 
-There are several rules in using this time-axis movement. See rules section for details.
+Here, `^` indicates that the graph continues into the next clock cycle, and `v` marks the other endpoint of a movement along the time axis (the z-axis). If the position `(x,y)` at clock cycle `T` is represented as `(x,y,T)`, this routing tree consists of `(5,2,1)`, `(5,1,1)`, `(4,1,1)`, `(4,1,2)`, `(3,1,2)`, and `(3,2,2)`. Several rules govern movement along the time axis; see the rules section for details.
 
 
 ## Application of 3D Routing
-Suppose there are three sequntial instructions.
+Suppose there are three sequential instructions.
 ```
-LATTICE_SUGERY [1 2] [V V]
-LATTICE_SUGERY [2 3] [H H]
-LATTICE_SUGERY [3 4 5] [V V]
+LATTICE_SURGERY [1 2] [V V]
+LATTICE_SURGERY [2 3] [H H]
+LATTICE_SURGERY [3 4 5] [V V V]
 ```
-on the following placement.
+on the following layout.
 ```
 . . . . . . . . .
 
@@ -52,34 +50,34 @@ on the following placement.
 
 The best routing in the original problem is as follows.
 ```
-LATTICE_SUGERY [1 2] [V V]
+LATTICE_SURGERY [1 2] [V V]
 T=1
 *-*-* . . . . . .
 |   |
 1 . 2 . 3 . 4 . 5
 
-LATTICE_SUGERY [2 3] [H H]
+LATTICE_SURGERY [2 3] [H H]
 T=2
 . . . . . . . . .
          
 1 . 2-*-3 . 4 . 5
 
-LATTICE_SUGERY [3 4 5] [V V]
+LATTICE_SURGERY [3 4 5] [V V V]
 T=3
 . . . . *-*-*-*-*
         |   |   |
 1 . 2 . 3 . 4 . 5
 ```
 
-By using the technique explained the above, we can reduce execution time to 2.
+Using the technique described above, we can reduce the execution time to two clock cycles.
 ```
-LATTICE_SUGERY [1 2] [V V]
+LATTICE_SURGERY [1 2] [V V]
 T=1
 *-*-* . . . . . .
 |   |
 1 . 2 . 3 . 4 . 5
 
-LATTICE_SUGERY [2 3] [H H]
+LATTICE_SURGERY [2 3] [H H]
 T=1
 . . . . . . . . .
          
@@ -89,7 +87,7 @@ T=2
         
 1 . 2-v 3 . 4 . 5
 
-LATTICE_SUGERY [3 4 5] [V V]
+LATTICE_SURGERY [3 4 5] [V V]
 T=1
 . . . . . ^-*-*-*
             |   |
@@ -100,17 +98,17 @@ T=2
 1 . 2 . 3 . 4 . 5
 ```
 
-## Rules for 3D routing
-When we execute a certain lattice surgery instruction, it must satisfy the following requirements. The 3D routing inherit the same requirements.
+## Rules for 3D Routing
 
-- **Rule 1. routing graph must be a tree**
-- **Rule 2. Every target node must be a leaf of a routing graph**
-- **Rule 3. Each leaf of a tree must be a node**
-- **Rule 4. all the non-target nodes must not be connected**
-- **Rule 5. all the data node must be touched from appropriate direction**
+Every lattice-surgery instruction must satisfy the following requirements. Three-dimensional routes inherit the same five basic rules as two-dimensional routes.
 
-In addition, the target tree must satisfy the following conditions. To describe the condition, we need definitions of new concepts, fork, kink, and segment.
-A fork is a node in a tree that has more than two edges in the 3D tree. For example, `(3,1,1), (4,1,2), (7,1,2)` are forks, and the other nodes are not fork.
+- **Rule 1. The routing graph must be a tree.**
+- **Rule 2. Every operand node must be a leaf of the routing graph.**
+- **Rule 3. Every leaf of the tree must be a data node.**
+- **Rule 4. No non-operand data node may be connected.**
+- **Rule 5. Every operand data node must be approached from the specified direction.**
+
+In addition, the routing tree must satisfy the conditions below. To state them, we first define three concepts: forks, kinks, and segments. A fork is a node of degree greater than two in a 3D tree. For example, `(3,1,1)`, `(4,1,2)`, and `(7,1,2)` are forks in the graph below; the other nodes are not.
 ```
 Coordinate
    1 2 3 4 5 6 7 8 9
@@ -152,19 +150,16 @@ T=3
 3| . . . . . . . . .
 ```
 
-If the fork as three edges to the spatial direction, it is called spatial fork. The other cases (i.e., fork that has edge to time-direction) is called temporal fork.
-In the above example `(3,1,1)` is a spatial fork, and `(4,1,2), (7,1,2)` are temporal fork.
+If a fork is not connected to top (node at T+1) or bottom (node at T-1) nodes, i.e., all the connectional is spatial, it is called a spatial fork. Any fork with an edge in the time direction is called a temporal fork. In the example above, `(3,1,1)` is a spatial fork, whereas `(4,1,2)` and `(7,1,2)` are temporal forks.
 
-- **3D Rule 1. there is no temporal fork in the routing graph**
+- **3D Rule 1. The routing graph must contain no temporal forks.**
 
-Next, we introduce a concept of kink and segment. Suppose a 3D routing tree that does not have any temporal fork.
-We can find a connected subgraph of Z-axis movement. As there is no temporal fork, a sequence of `^...v` cannot branch during the Z-movement, and starts and ends to XY-plane movement.
-If the first and last XY-movement goes 90 degrees or 270 degrees turned, we say that structure a is a kink.
+Next, we introduce kinks and segments. Consider a 3D routing tree with no temporal forks. Each connected subgraph consisting of z-axis edges is a nonbranching sequence of the form `^...v` whose endpoints connect to movements in the xy-plane. Such a sequence is called a kink if the directions of the xy-plane edges at its two endpoints differ by 90 or 270 degrees.
 
-For example, in the following example, there are three Z-axis movement.
+The following example contains three z-axis movements.
 Z-move 1: `(2,2,1), (2,2,2)`
 Z-move 2: `(4,1,1), (4,1,2), (4,1,3)`
-Z-move 3: `(4,2,7), (4,3,7)`
+Z-move 3: `(7,1,2), (7,1,3)`
 
 ```
 Coordinate
@@ -207,13 +202,10 @@ T=3
 3| . . . . . . . . .
 ```
 
-Here, Z-move 1 goes horizontally at T=1 and vertically at T=2, and this is a kink. 
-Z-move 2 goes horizontally at T=1 and T=3, thus this is NOT a kink. 
-Z-move 3 goes horizontally at T=2 and veritcally at T=3, and this is a kink.
+Z-movement 1 is horizontal at `T=1` and vertical at `T=2`, so it is a kink. Z-movement 2 is horizontal at both `T=1` and `T=3`, so it is not a kink. Z-movement 3 is horizontal at `T=2` and vertical at `T=3`, so it is a kink.
 
 
-Next, we define segments. A segment is a tree that at least has one XY-plane movement when we split 3D tree for each time slice.
-In the above example, we can see there is four segments as shown below.
+Next, we define segments. After splitting a 3D tree into time slices, a segment is a connected tree within one time slice that contains at least one xy-plane edge. If there are multiple disconnected trees, they are considered as different segments. The example above has four segments, as shown below.
 
 ```
 Segment A @ T=1
@@ -255,34 +247,25 @@ Segment D @ T=3
 3| . . . . . . . . .
 ```
 
-In this view, we can see a 3D graph is a segment tree that are connected by Z-axis movement.
-Segment A and B are connected with kink Z-movement at `(2,2)`.
-Segment A and D are connected with non-kink Z-movement at `(4,1)`.
-Segment C and D are connected with kink Z-movement at `(7,1)`.
-Thus, we can draw a segment tree as follows.
+From this perspective, the 3D graph is a tree of segments connected by z-axis movements. Segments A and B are connected by a kink at `(2,2)`. Segments A and D are connected by a non-kink z-axis movement at `(4,1)`. Segments C and D are connected by a kink at `(7,1)`. The resulting segment tree is
 ```
 A-B
 |
 D-C
 ```
 
-Using this segment tree, We classify all the segment into even and odd segments as follows.
-First, we choose a certain leaf segment (in the above case, we choose B or C) as a root. We assigne even segment to the root segment. We choose B as a root in this explanation.
-The parity of the other segment is determined whether the number of kinks from root to target is even or odd.
-As edges between A-B and C-D are kinks, and an edge between A-D is non-kink, the assignment is 
+Using this segment tree, we classify the segments as even or odd. First, choose any segment with data node as the root, and assign it even parity. Here, we choose B as the root. The parity of every other segment is determined by whether the path from the root contains an even or odd number of kinks. Because the edges A–B and C–D represent kinks whereas A–D does not, the assignment is
 - B: even
 - A: odd
 - D: odd
 - C: even
 
-Then, we can provide the last two conditions.
+We can now state the final two conditions.
 
-- **3D Rule 2. Odd segments have no fork**
-- **3D Rule 3. Data node does belongs to even segment**
+- **3D Rule 2. Odd segments must contain no forks.**
+- **3D Rule 3. Every operand data node must belong to even segments.**
 
-If the above two conditions are satisfied, every odd segment must start from Z-axis movement and finish with Z-axis movement.
-Note that whether this condition is satisfied or not is independent of the choice of a root segment.
-In the above example, odd segments A and D have data nodes and forks. Thus, the above example violates both 3D Rule 2 and 3. A valid example is as follows.
+If these two conditions are satisfied, every odd segment begins and ends with a z-axis movement. Whether the conditions hold is independent of the choice of root segment. In the example above, odd segments A and D contain data nodes and forks, so the graph violates both 3D Rule 2 and 3. A valid example follows.
 
 ```
 T=1
@@ -305,9 +288,7 @@ T=2
 3| . v-*-*-*-v . . .
 ```
 
-This is valid and works as `LATTICE_SURGERY [1 2 3 4] [H V V V]`.
-We explain why this is valid. This 3D graph is a Steiner tree toucing target data nodes with appropriate boundaries, and this satisfies Rules 1-5.
-This routing path does not have any temporal fork, and it satisfies 3D Rule 1. There are five segments in total as follows.
+This graph is a valid implementation of `LATTICE_SURGERY [1 2 3 4] [H V V V]`. It is a Steiner tree that touches the operand data nodes through the specified boundaries and therefore satisfies Rules 1–5. It contains no temporal forks, so it also satisfies 3D Rule 1. Its five segments are shown below.
 
 ```
 Segment A @ T=1
@@ -362,34 +343,29 @@ D-A-E-C
     |
     B
 ```
-Here, edges between `(D,A), (A,E)` are kinks, and the others are not kink.
-Thus, only segment A is a odd segment, and the other segments are even.
-We can see odd segment A does not have any data node and fork, thus this satisfies 3D Rule 2 and 3.
-Thus, this routing graph is valid.
+Here, the edges `(D,A)` and `(A,E)` represent kinks; the other edges do not. Thus, only segment A is odd, and all other segments are even. Odd segment A contains neither data nodes nor forks, so the graph satisfies 3D Rules 2 and 3 and is therefore valid.
 
-Note that this formalism contains original lattice surgery definitions as a special cases where there is only a single segment.
+The original 2D lattice-surgery definition is the special case of this formalism in which the routing graph has only one segment.
 
 
-## Extension to multi-target CNOT
-We can also perform multi-target CNOT by using a similar concept. Let `MULTI_TARGET_CNOT [2 3 4] [V V V]` be a multi-control NOT get acting on data nodes 2, 3, and 4.
-We say the first data node as control data node, and the other nodes are target nodes. In this instruction, control data node is 2, and 3 and 4 are target data nodes.
-This instruction can be executed by assigning a 3D routing graph satisfying the following.
+## Extension to Multi-Target CNOT
 
-The basic rules and 3D rule 1 are the same.
+A similar construction can be used to perform a multi-target CNOT. Let `MULTI_TARGET_CNOT [2 3 4] [V V V]` denote a CNOT gates, which applies Pauli X gates on data 3 and 4 if the data 2 is True. The first data node is called a control data node, the remaining data nodes are called target data nodes, and the union of them are called operand data nodes. The instruction can be executed using any 3D routing graph that satisfies the following rules.
 
-- **Rule 1. routing graph must be a tree**
-- **Rule 2. Every target node must be a leaf of a routing graph**
-- **Rule 3. Each leaf of a tree must be a node**
-- **Rule 4. all the non-target nodes must not be connected**
-- **Rule 5. all the data node must be touched from appropriate direction**
-- **3D CNOT Rule 1. there is no temporal fork in the routing graph**
+The five basic rules and 3D Rule 1 remain unchanged.
 
-When we assign even or odd parity to each segment, we assign odd segment to a segment with control data node, and determine the parity of the other segments.
-Then, we can define the other conditions.
+- **Rule 1. The routing graph must be a tree.**
+- **Rule 2. Every operand node must be a leaf of the routing graph.**
+- **Rule 3. Every leaf of the tree must be a data node.**
+- **Rule 4. No non-operand data node may be connected.**
+- **Rule 5. Every operand data node must be approached from the specified direction.**
+- **3D CNOT Rule 1. The routing graph must contain no temporal forks.**
 
-- **3D CNOT Rule 2. Odd segments have no fork**
-- **3D CNOT Rule 3. Target data node does belongs to even segment**
-- **3D CNOT Rule 3. Control data node belongs to an odd segment**
+To assign parity, first assign even parity to the segment containing a target data node (any choice is okay for judging whether the routing graph satisfies the requirement), and then determine the parity of all other segments. The remaining conditions are
+
+- **3D CNOT Rule 2. Odd segments must contain no forks.**
+- **3D CNOT Rule 3. Every target data node must belong to an even segment.**
+- **3D CNOT Rule 4. The control data node must belong to an odd segment.**
 
 
 ```
@@ -412,15 +388,23 @@ T=2
  |              
 3| . . . . . . . . .
 ```
-There are three segment, and a segment with control data node 2 is odd, and the others are even segments.
-We can see an odd segment does not have any fork, and all the target data nodes belong to even segment.
-Thus, this works as `MULTI_TARGET_CNOT [2 3 4] [V V V]`.
+There are three segments. The segment containing control data node 2 is odd, and the other two segments are even. The odd segment contains no fork, and all target data nodes belong to even segments. Therefore, this graph implements `MULTI_TARGET_CNOT [2 3 4] [V V V]`.
 
+
+## Parallel execution of Lattice Surgery and Multi-Target CNOT
+
+The essential rules are the same.
+- **Parallel Rule 1. Routing trees must not share any empty node at the same time.**
+- **Parallel Rule 2. Routing trees must not share a data node through boundaries of different orientations at the same time.**
+
+Also, as the instruction of 3D routing can span multile time clock, we need to define requirement for the ordering.
+
+- **3D Parallel Rule 1. If instruction A is executed after B and they share operand data node x and touch with different types of boundaries, data node x must be touched by A after B.**
 
 ## Input and Output
 
 ### Input
-The input is written in the following form.
+The input has the following format.
 ```
 v e n m
 x_1 y_1
@@ -435,24 +419,22 @@ t_1 k_1
 q_{1,1} q_{1,2} ... q_{1,t_1}
 p_{1,1} p_{1,2} ... p_{1,t_1}
 t_2 k_2
-q_{2,1} q_{2,2} ... q_{2,t_1}
-p_{2,1} p_{2,2} ... p_{2,t_1}
+q_{2,1} q_{2,2} ... q_{2,t_2}
+p_{2,1} p_{2,2} ... p_{2,t_2}
 ...
 t_m k_m
-q_{m,1} q_{m,2} ... q_{m,t_1}
-p_{m,1} p_{m,2} ... p_{m,t_1}
+q_{m,1} q_{m,2} ... q_{m,t_m}
+p_{m,1} p_{m,2} ... p_{m,t_m}
 ```
 
-Here, `v, e, n, m, x_i, y_i, w_{i,j}, t_i, q_{i,j}, p_{i,j}` are the same as 2D case.
-`k_i \in {CX, LS}` specifies the target instruction is multi-target CNOT or lattice surgery.
-If `k_i = CX`, the control data node is `q_{i,1}`.
+Here, `v, e, n, m, x_i, y_i, w_{i,j}, t_i, q_{i,j}, p_{i,j}` have the same meanings as in the 2D case. `k_i \in {CX, LS}` specifies whether the instruction is a multi-target CNOT or a lattice-surgery instruction. If `k_i = CX`, then `q_{i,1}` is the control data node.
 
 
 ### Output
-The output must be writte in the following form.
+The output must have the following format.
 ```
 P_1 P_2 ... P_n
-S_1 E_1
+S_1
 T_{1,1} R_{1,1} E_{1,1,1} E_{1,1,2} ... E_{1,1,R_{1,1}}
 T_{1,2} R_{1,2} E_{1,2,1} E_{1,2,2} ... E_{1,2,R_{1,2}}
 ...
@@ -460,47 +442,63 @@ T_{1,S_1} R_{1,S_1} E_{1,S_1,1} E_{1,S_1,2} ... E_{1,S_1,R_{1,S_1}}
 G_{1,1,1} G_{1,1,2} H_{1,1}
 G_{1,2,1} G_{1,2,2} H_{1,2}
 ...
-G_{1,E_1,1} G_{1,E_1,2} H_{1,E_1}
+G_{1,S_1-1,1} G_{1,S_1-1,2} H_{1,S_1-1}
 ...
-S_m E_m
+S_m
 T_{m,1} R_{m,1} E_{m,1,1} E_{m,1,2} ... E_{m,1,R_{m,1}}
 ...
 T_{m,S_m} R_{m,S_m} E_{m,S_m,1} E_{m,S_m,2} ... E_{m,S_m,R_{m,S_m}}
 G_{m,1,1} G_{m,1,2} H_{m,1}
 ...
-G_{m,E_m,1} G_{m,E_m,2} H_{m,E_m}
+G_{m,S_m-1,1} G_{m,S_m-1,2} H_{m,S_m-1}
 ```
 
-Here, `P_i` is the node of i-th qubit is located and must satisfy `1 <= P_i <= v`. As qubit are located in different place, if `i \neq i'` then `P_i \neq P_i'`.
-A sequence of the following set specifies an assignment to the i-th instruction.
+Here, `P_i` is the node at which the `i`-th qubit is located and must satisfy `1 <= P_i <= v`. Because different qubits occupy different nodes, if `i \neq i'`, then `P_i \neq P_i'`. The following block specifies an assignment for the `i`-th instruction.
 ```
-S_i E_i
-T_{i,1} R_{i,1} E_{i,1,1} E_{i,1,2} ... E_{i,1,R_{1,1}}
-T_{i,2} R_{i,2} E_{i,2,1} E_{i,2,2} ... E_{i,2,R_{1,2}}
+S_i
+T_{i,1} R_{i,1} E_{i,1,1} E_{i,1,2} ... E_{i,1,R_{i,1}}
+T_{i,2} R_{i,2} E_{i,2,1} E_{i,2,2} ... E_{i,2,R_{i,2}}
 ...
 T_{i,S_i} R_{i,S_i} E_{i,S_i,1} E_{i,S_i,2} ... E_{i,S_i,R_{i,S_i}}
 G_{i,1,1} G_{i,1,2} H_{i,1}
 G_{i,2,1} G_{i,2,2} H_{i,2}
 ...
-G_{i,E_i,1} G_{i,E_i,2} H_{i,E_i}
+G_{i,S_i-1,1} G_{i,S_i-1,2} H_{i,S_i-1}
 ```
-`S_i` is the number of segments in the i-th instructions.
-`E_i` is the number of Z-movement in the i-th instruction.
-`T_{i,j}` is the number of time clock of j-th segment in the i-th instruction.
-`R_{i,j}` is the number of edges in the j-th segment in the i-th instruction.
-`E_{i,j,k}` is the k-th edge of the j-th segment in the i-th instruction.
-`G_{i,j,0}` and `G_{i,j,0}` are two indices of segments that are connected with the j-th edge in the segment tree for the i-th instruction.
-`H_{i,j}` is the node index that 3D tree moves along with Z-axis to connect the j-th edge in the segment tree for the i-th instruction.
+`S_i` is the number of segments in the `i`-th instruction.
+`T_{i,j}` is the clock cycle of the `j`-th segment in the `i`-th instruction and satisfies `T_{i,j} >= 1`
+`R_{i,j}` is the number of edges in the `j`-th segment of the `i`-th instruction and satisfies `R_{i,j} >= 1`
+`E_{i,j,k}` is the `k`-th edge of the `j`-th segment in the `i`-th instruction and satisfise `1 <= E_{i,j,k} <= e`
+`G_{i,j,1}` and `G_{i,j,2}` are the indices of the two segments connected by the `j`-th edge of the segment tree for the `i`-th instruction and satisfies `1 <= G_{i,j,k} <= S_i` Note that since segments tree is a tree, there are always `S_i-1` edges in this tree.
+`H_{i,j}` is the index of the node along which the 3D tree moves in the z direction to form the `j`-th edge of the segment tree for the `i`-th instruction, and satisfies `1 <= H_{i,j} <= v`.
 
-
+The aim is to minimize `max_{i,j} T_{i,j}`.
 
 ## Problem simplification
-The above definition is complicated, we can typically simplify the problem as follows. The following conditions are not necessarily assumed, but some papers employ them for simplifying the problem and focusing on the optimization.
+The definition above is complex, so the problem is often simplified using the assumptions below. These assumptions are optional, but some papers use them to isolate the optimization problem.
 
 - **Assumption 1: all single-target CNOT**
 
-Several popular compilation schemes only output single-target CNOT gates. This is equal to assume `t_i=2` and `k_i=CX`.
+Several popular compilation schemes output only single-target CNOT gates. This is equivalent to assuming `t_i=2` and `k_i=CX`.
 
-- **Assumption 1: all lattice surgery**
+- **Assumption 2: all lattice surgery**
 
-Several popular compilation schemes only output multi-target lattice surgery only. This is equal to assume `k_i=LS`.
+Several popular compilation schemes output only lattice-surgery instructions. This is equivalent to assuming `k_i=LS`.
+
+
+## Heuristic Solution for the 3D Routing Problem
+
+This section presents a heuristic for routing a `MULTI_TARGET_CNOT`. Lattice-surgery routing can be handled as a special case, as described below. Because the procedure is heuristic, it is not guaranteed to find a route even when a feasible route exists.
+
+- **Step 1: Construct a 2D Steiner tree for the target data nodes.**
+  - Finding a minimum Steiner tree is NP-hard, so an approximation or a greedy heuristic may be used. For example, suppose the target data nodes are `[1,2,3,...,m]`. First, find a shortest path between nodes `1` and `2`. Next, connect node `3` to the existing tree by a shortest path, and repeat this process through node `m`. Every path must also respect the boundary constraints and avoid non-operand data nodes and empty nodes that are already used by the processed instructions.
+
+- **Step 2: Embed the 2D Steiner tree in spacetime.**
+  - Assign the vertices and edges of the 2D tree to time slices, analogously to placing blocks in Tetris, while avoiding resources already occupied by previously routed instructions. See Figures 9 and 10 of [K. Hamada et al., *Efficient and High-Performance Routing of Lattice-Surgery Paths on a Three-Dimensional Lattice*](https://arxiv.org/abs/2401.15829) for its intuitive visualization. If the resulting 3D graph violates the parity conditions for odd segments, adjust the time slices of its segments and introduce or remove kinks as necessary. If no valid embedding is found within a prescribed search limit, report failure or fall back to placing the entire 2D tree in an unoccupied time slice. This fallback produces a single even segment, provided that such a time slice and spatial route are available.
+
+- **Step 3: Attach the control data node.**
+  - Find a path from the control data node to the existing tree of target data nodes. Add the path in a way that preserves the tree structure and all boundary and occupancy constraints. If the control data node does not thereby belong to an odd segment, introduce a pinch structure that changes the required parity, or increase the time clock of touching the control data node. The pinch construction is described in Figures 11 and 12 of [K. Hamada et al., *Efficient and High-Performance Routing of Lattice-Surgery Paths on a Three-Dimensional Lattice*](https://arxiv.org/abs/2401.15829). 
+
+Apply this procedure to the instructions in order. Resources occupied by previously routed instructions and the required ordering of accesses to shared operand data nodes must be included when routing each subsequent instruction. This greedy procedure does not guarantee a globally optimal schedule.
+
+For a `LATTICE_SURGERY` instruction, apply Steps 1 and 2 to all operand data nodes and omit Step 3. When there are exactly two operand data nodes, Step 1 reduces to a shortest-path problem. In an unweighted graph, it can be solved exactly by breadth-first search; in a weighted graph with nonnegative edge weights, Dijkstra's algorithm can be used.
